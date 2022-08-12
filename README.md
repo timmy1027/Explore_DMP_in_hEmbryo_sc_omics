@@ -18,4 +18,6 @@ were excluded.
 
 Non-zero genes were defined as that a gene must be expressed in at least 10 cells  
 
-Filtered Seurat was created by filtered_counts and filtered_seurat@meta.data
+Filtered Seurat was created by "filtered_counts"" and "filtered_seurat@meta.data"  
+
+save merged Seurat project in "data/seurat_filtered.RData"
