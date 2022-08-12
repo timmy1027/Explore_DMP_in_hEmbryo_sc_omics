@@ -88,7 +88,7 @@ split_seurat$DMP@assays
 VlnPlot(split_seurat$BAd6, features = c("FOXC1", "PAX3", "UCP1", "NR4A2", "PRDM16"), 
         pt.size = 0.2, ncol = 4)
 
-
+saveRDS(object = split_seurat, file = "data/split_seurat.RData")
 
 
 

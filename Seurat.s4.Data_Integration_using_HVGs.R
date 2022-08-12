@@ -1,6 +1,7 @@
 # Seurat Integrate samples using shared highly variable genes
 ## Reference1: https://satijalab.org/seurat/archive/v3.1/sctransform_vignette.html
-#@ Reference2: https://hbctraining.github.io/scRNA-seq/lessons/06_SC_SCT_and_integration.html
+## Reference2: https://hbctraining.github.io/scRNA-seq/lessons/06_SC_SCT_and_integration.html
+## Reference3: https://bookdown.org/ytliu13207/SingleCellMultiOmicsDataAnalysis/stacked-vlnplot-for-given-features-sets.html
 library(Seurat)
 library(tidyverse)
 library(RCurl)
@@ -22,7 +23,7 @@ integ_anchors <- FindIntegrationAnchors(object.list = split_seurat,
                                         anchor.features = integ_features)
 
 ################# memory exhausted #########################
-################# remote HPC instead #########################
+################# remote HPC instead ######################
 
 # Integrate across conditions
 options(future.globals.maxSize = 12000 * 1024^2) #use 12Gb memory
