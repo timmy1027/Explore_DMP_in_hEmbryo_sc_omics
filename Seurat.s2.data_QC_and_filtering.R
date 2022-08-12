@@ -1,4 +1,4 @@
-# Seurat data QC
+# Seurat data QC and filtering
 
 ## reference: 
 ### https://satijalab.org/seurat/articles/pbmc3k_tutorial.html
@@ -56,7 +56,7 @@ metadata$sample[which(str_detect(metadata$cells, "^BAd6_"))] <- "BAd6"
 combined@meta.data <- metadata
 
 # Create .RData object to load at any time
-save(combined, file="data/combined_raw_seurat.RData")
+saveRDS(combined, file="data/combined_raw_seurat.RData")
 
 
 # Assessing the quality metrics
@@ -173,7 +173,8 @@ filtered_seurat <- CreateSeuratObject(filtered_counts, meta.data = filtered_comb
 # Save filtered Seurat project
 save(filtered_seurat, file="data/seurat_filtered.RData")
 
-
+saveRDS(filtered_seurat, file="data/seurat_filtered.RData")
+test.obj <- readRDS("data/seurat_filtered.RData")
 
 
 # Extract the new metadata from the filtered Seurat object to go through the same plots as with the unfiltered data
