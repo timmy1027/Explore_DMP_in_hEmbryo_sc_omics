@@ -26,12 +26,19 @@ integ_anchors <- FindIntegrationAnchors(object.list = split_seurat,
 ################# remote HPC instead ######################
 
 # Integrate across conditions
-options(future.globals.maxSize = 12000 * 1024^2) #use 12Gb memory
+options(future.globals.maxSize = 100000 * 1024^2) #use 12Gb memory
 seurat_integrated <- IntegrateData(anchorset = integ_anchors, 
                                    normalization.method = "SCT")
 
 # Save integrated seurat object
-saveRDS(seurat_integrated, "data/integrated_seurat.rds")
+saveRDS(seurat_integrated, "data/integrated_seurat.RData")
+
+# Run PCA
+seurat_integrated <- RunPCA(object = seurat_integrated)
+
+# Plot PCA
+PCAPlot(seurat_integrated,
+        split.by = "sample")
 
 # Run UMAP
 seurat_integrated <- RunUMAP(seurat_integrated, 
@@ -39,11 +46,15 @@ seurat_integrated <- RunUMAP(seurat_integrated,
                              reduction = "pca")
 
 # Plot UMAP                             
-DimPlot(seurat_integrated)                             
+tiff(filename = "figure/s4_Integrated_UMAP.tiff", width = 1500, height = 1300, units = "px", res = 300)
+DimPlot(seurat_integrated)
+dev.off()
 
+tiff(filename = "figure/s4_Integrated_UMAP_bySample.tiff", width = 3000, height = 3500, units = "px", res = 300)
 DimPlot(seurat_integrated,
-        split.by = "sample") 
-
+        split.by = "sample",
+        ncol = 3) 
+dev.off()
 
 
 
