@@ -192,12 +192,7 @@ write.csv(top.markers, file = "FindMarkers.ssn0.2.csv")
 
 
 
-library(dplyr)
-library(scran)
-library(batchelor)
-library(Seurat)
-library(scales)
-library(kableExtra)
+
 
 
 
