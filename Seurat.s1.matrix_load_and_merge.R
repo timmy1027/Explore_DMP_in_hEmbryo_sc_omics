@@ -24,5 +24,5 @@ combined <- merge(x = DMP,
                   add.cell.id = c("DMP", "BAd1", "BAd3", "BAd6", "SKMd1", "SKMd3", "SKMd6"))
 
 # Check that the merged object has the appropriate sample-specific prefixes
-head(combined@meta.data)
+tail(combined@meta.data, 100)
 tail(combined@meta.data)
