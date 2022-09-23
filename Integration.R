@@ -9,6 +9,11 @@ library(Seurat)
 library(scales)
 library(kableExtra)
 library(Matrix)
+library(scater)
+library(cowplot)
+library(BiocParallel)
+library(BiocNeighbors)
+
 
 matrix_dir = "/Users/tianming1027/Desktop/Seq_Files/SBS_scRNAseq/GSE157329_Xu_Human _CS12_to_CS16/So/"
 barcode.path <- paste0(matrix_dir, "barcodes.tsv.gz")
@@ -173,53 +178,166 @@ samples <- as.character(unique(meta.data$seq_folder))
 table(meta.data$seq_folder)
 #BAd1  BAd3  BAd6   DMP    h0    h5   h9a   h9b   ht7    l0    l9   lv5   lv6 SKMd1 SKMd3 SKMd6    t0    t5    t6    t9   tv7    v0    v6   vl5 
 #1841  2347  1841  3735  3527 10081  2462  2389  9300  8414  2759 12859  5239  4091  4017 12068  3380  7224     1  2503  8693  3457  6301 13781 
-
+BAd1  BAd3  BAd6   DMP    h0    h5   h9a   h9b   ht7    l0    l9   lv5   lv6 SKMd1 SKMd3 SKMd6 t0    t5    t6    t9   tv7    v0    v6   vl5
 
 #Data Integration, https://nbisweden.github.io/excelerate-scRNAseq/session-integration/Data_Integration.html
-options(future.globals.maxSize = 12000 * 1024^2) #12 Gb
+options(future.globals.maxSize = 120000 * 1024^2) #120 Gb
 sample.list <- SplitObject(combined, split.by = "seq_folder")
-for (i in 1:length(sample.list)) {
-  sample.list[[i]] <- NormalizeData(sample.list[[i]], verbose = FALSE)
-  sample.list[[i]] <- FindVariableFeatures(sample.list[[i]], selection.method = "vst", nfeatures = 2000, 
-                                             verbose = FALSE)
+
+#filtered h0
+counts <- GetAssayData(object = sample.list$t6, slot = "counts")
+nonzero <- counts > 0
+keep_genes <- Matrix::rowSums(nonzero) >= 10
+filtered_counts <- counts[keep_genes, ]
+filtered.t6 <- CreateSeuratObject(filtered_counts,
+                                  meta.data = sample.list$t6@meta.data)
+
+keep_genes <- Reduce(intersect, list(rownames(filtered.BAd1),rownames(filtered.BAd3),
+                                     rownames(filtered.BAd6),rownames(filtered.DMP),
+                                     rownames(filtered.SKMd1),rownames(filtered.SKMd3),
+                                     rownames(filtered.SKMd6),rownames(filtered.t0),
+                                     rownames(filtered.t5),
+                                     rownames(filtered.t9),rownames(filtered.l9),
+                                     rownames(filtered.tv7),rownames(filtered.h0),
+                                     rownames(filtered.h5),rownames(filtered.h9a),
+                                     rownames(filtered.ht7),rownames(filtered.v0),
+                                     rownames(filtered.v6),rownames(filtered.lv5),
+                                     rownames(filtered.lv6),rownames(filtered.vl5),
+                                     rownames(filtered.l0)
+                                     ))
+
+
+data.l0 <- as.SingleCellExperiment(sample.list$l0)
+data.l0 <- data.l0[match(keep_genes, rownames(data.l0)), ]
+data.l0 <- computeSumFactors(data.l0)
+data.l0 <- logNormCounts(data.l0)
+
+# total raw counts
+counts_samples <- cbind(counts(data.BAd1),counts(data.BAd3),
+                        counts(data.BAd6),counts(data.DMP),
+                        counts(data.SKMd1),counts(data.SKMd3),
+                        counts(data.SKMd6),counts(data.t0),
+                        counts(data.t5),
+                        counts(data.t9),counts(data.l9),
+                        counts(data.tv7),counts(data.h0),
+                        counts(data.h5),counts(data.h9a),
+                        counts(data.ht7),counts(data.v0),
+                        counts(data.v6),counts(data.lv5),
+                        counts(data.lv6),counts(data.vl5),
+                        counts(data.l0)
+                        )
+
+mBN.counts.samples <- multiBatchNorm(data.BAd1, data.BAd3, data.BAd6,data.DMP,
+                                     data.SKMd1, data.SKMd3,data.SKMd6,
+                                     data.t0, data.t5, data.t9, data.l9,
+                                     )
+
+# total normalized counts (with multibatch normalization)
+logcounts_samples <- cbind(logcounts(data.BAd1),logcounts(data.BAd3),
+                           logcounts(data.BAd6),logcounts(data.DMP),
+                           logcounts(data.SKMd1),logcounts(data.SKMd3),
+                           logcounts(data.SKMd6),logcounts(data.t0),
+                           logcounts(data.t5),
+                           logcounts(data.t9),logcounts(data.l9),
+                           logcounts(data.tv7),logcounts(data.h0),
+                           logcounts(data.h5),logcounts(data.h9a),
+                           logcounts(data.ht7),logcounts(data.v0),
+                           logcounts(data.v6),logcounts(data.lv5),
+                           logcounts(data.lv6),logcounts(data.vl5),
+                           logcounts(data.l0)
+)
+
+# sce object of the combined data 
+sce <- SingleCellExperiment( 
+  assays = list(counts = counts_samples, logcounts = logcounts_samples),  
+  rowData = rowData(data.l0), 
+  colData = rbind(colData(data.BAd1),colData(data.BAd3),
+                  colData(data.BAd6),colData(data.DMP),
+                  colData(data.SKMd1),colData(data.SKMd3),
+                  colData(data.SKMd6),colData(data.t0),
+                  colData(data.t5),
+                  colData(data.t9),colData(data.l9),
+                  colData(data.tv7),colData(data.h0),
+                  colData(data.h5),colData(data.h9a),
+                  colData(data.ht7),colData(data.v0),
+                  colData(data.v6),colData(data.lv5),
+                  colData(data.lv6),colData(data.vl5),
+                  colData(data.l0)) 
+)
+
+saveRDS(object = sce, file = "sce.RDS")
+
+#################################################
+combined <- readRDS("DMP.hoea.combined.filtered.RDS")
+sce.ob <- readRDS("sce.ob.RDS")
+meta.data <- combined@meta.data
+combined.counts <- GetAssayData(object = combined, slot = "counts")
+meta.data$cell <- rownames(meta.data)
+experiments <- c("hoea", "DMP")
+sce.ob <- list()
+for (b in experiments){ 
+  temp.M <- meta.data %>% filter(project == b) 
+  temp.sce <-  SingleCellExperiment(list(counts = as.matrix(combined.counts[keep_genes,temp.M$cell])), colData = temp.M) %>%
+    computeSumFactors()
+  sce.ob[[b]] <- temp.sce
 }
 
-#Reference-based large dataset integration, https://satijalab.org/seurat/articles/integration_large_datasets.html
-reference.list <- sample.list[c("DMP", "h0", "lv5", "vl5")]
-samples.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30)
 
-samples.integrated <- IntegrateData(anchorset = samples.anchors, dims = 1:30)
+mBN.sce.ob <- multiBatchNorm(sce.ob$hoea, sce.ob$DMP)
+names(mBN.sce.ob) <- experiments
 
-# switch to integrated assay. The variable features of this assay are automatically set during integrateData
-DefaultAssay(samples.integrated) <- "integrated"
+lognormExp.mBN <- mBN.sce.ob %>%
+  lapply(function(x){logcounts(x) %>% as.data.frame() 
+    %>% return()}) %>%
+  do.call("bind_cols",.)
 
-# Run the standard workflow for visualization and clustering
-samples.integrated <- ScaleData(samples.integrated, verbose = FALSE)
-samples.integrated <- RunPCA(samples.integrated, npcs = 30, verbose = FALSE)
-pancreas.isamples.integratedntegrated <- RunUMAP(samples.integrated, reduction = "pca", dims = 1:30)
-p1 <- DimPlot(samples.integrated, reduction = "umap", group.by = "hoea.cell.type")
-p2 <- DimPlot(samples.integrated, reduction = "umap", group.by = "DMP_sample", label = TRUE, repel = TRUE) + 
-  NoLegend()
-plot_grid(p1, p2)
+varGene = 2000
+pc = 20
 
-#Alternative integration using Mutual Nearest Neighbor (MNN)
+sobj <-
+  CreateSeuratObject(
+    combined.counts[rownames(lognormExp.mBN),meta.data$cell], meta.data = meta.data
+  ) %>%
+  NormalizeData(verbose = FALSE)
 
+sobj@assays$RNA@data <- as.matrix(lognormExp.mBN[rownames(lognormExp.mBN),colnames(sobj)])
 
+sobj.list <- SplitObject(sobj, split.by = "project") %>%
+  lapply(function(x){ x = FindVariableFeatures(x, verbose=F, nfeatures = varGene)})
+sobj.list <- sobj.list[experiments]
 
+rm(combiend.counts, combined, lognormExp.mBN, mBN.sce.ob, sce.ob)
 
+set.seed(123)
+sobj <- SeuratWrappers::RunFastMNN(sobj.list, verbose = F, features = varGene) %>%
+  RunUMAP(reduction = "mnn", dims = 1:pc, verbose = F) %>%
+  FindNeighbors(reduction = "mnn", dims = 1:pc, verbose = F)
 
-
-
-
-
-
-
-
-
-
-
-
-
+for(plotby in c("hoea.cell.type","DMP_sample","hoea.embryo.stage")){
+  Idents(sobj) <- plotby
+  
+  if(plotby == "hoea.embryo.stage"){
+    orderidents <- unique(sobj@meta.data$hoea.embryo.stage)
+    cols<-rev(c("#f0590e","#cca95e","#960000","gray90"))
+  } else if(plotby == "DMP_sample"){
+    orderidents <- c("DMP", "BAd1", "BAd3", "BAd6", "SKMd1", "SKMd3", "SKMd6", "other")
+    cols<-rev(c("#ff6361","#58508d","#5ecc74","#bc5090","#cca95e","#5e69cc","#b81212","gray90"))
+  }else{
+    orderidents <- c(setdiff(levels(Idents(sobj)),"other"),"other")
+    cols <- c("gray90", hue_pal()(length(orderidents)-1))
+  }
+  
+  sobj[[plotby]] <- factor(Idents(sobj), levels = orderidents)
+  ncol <- max(3, floor(length(orderidents)/6))
+  
+  print(
+    DimPlot(sobj, order=orderidents, cols=cols, pt.size=0.3, raster = FALSE) +
+      theme(aspect.ratio=1) +
+      theme(legend.position="bottom", legend.title=element_blank()) +
+      guides(color = guide_legend(override.aes=list(size=3), ncol=ncol))
+  )
+  
+}
 
 
 
