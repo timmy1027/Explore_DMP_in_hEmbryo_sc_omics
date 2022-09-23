@@ -160,32 +160,79 @@ write.csv(meta1, "combined.raw.metadata.csv")
 saveRDS(combined, file = "combined.raw.RDS")
 
 
-#Data Integration
-combined.normalized <- NormalizeData(combined, verbose = FALSE)
-combined.normalized@assays$RNA@data[1:10, 1:20]
 
-experiments <- c("DMP", "hoea")
-varGene = 2000
-pc = 20
-sobj.list <- SplitObject(combined.normalized, split.by = "project") %>%
-  lapply(function(x){ x = FindVariableFeatures(x, verbose=F, nfeatures = varGene)})
-sobj.list <- sobj.list[experiments]
-
-set.seed(123)
-combined.normalized <- SeuratWrappers::RunFastMNN(sobj.list, verbose = F, features = varGene) %>%
-  RunUMAP(reduction = "mnn", dims = 1:pc, verbose = F) %>%
-  FindNeighbors(reduction = "mnn", dims = 1:pc, verbose = F)
-
-combined.normalized[["old.ident"]] <- Idents(object = combined.normalized)
-
-idents <- as.character(unique(Idents(combined.normalized)))
-DimPlot(combined.normalized, order = idents, 
-        reduction = "mnn",raster = FALSE)
-
-tiff(filename = test, width = 800, height = 1000)
-FeaturePlot(combined.normalized, features = "PITX1", split.by = "sample", max.cutoff = 3, 
-            cols = c("grey", "red"), raster=FALSE)
-dev.off()
 
 
 #https://satijalab.org/seurat/articles/essential_commands.html
+
+##
+meta.data <- combined@meta.data
+#unique sample names
+samples <- as.character(unique(meta.data$seq_folder))
+#number of cells per sample
+table(meta.data$seq_folder)
+#BAd1  BAd3  BAd6   DMP    h0    h5   h9a   h9b   ht7    l0    l9   lv5   lv6 SKMd1 SKMd3 SKMd6    t0    t5    t6    t9   tv7    v0    v6   vl5 
+#1841  2347  1841  3735  3527 10081  2462  2389  9300  8414  2759 12859  5239  4091  4017 12068  3380  7224     1  2503  8693  3457  6301 13781 
+
+
+#Data Integration, https://nbisweden.github.io/excelerate-scRNAseq/session-integration/Data_Integration.html
+options(future.globals.maxSize = 12000 * 1024^2) #12 Gb
+sample.list <- SplitObject(combined, split.by = "seq_folder")
+for (i in 1:length(sample.list)) {
+  sample.list[[i]] <- NormalizeData(sample.list[[i]], verbose = FALSE)
+  sample.list[[i]] <- FindVariableFeatures(sample.list[[i]], selection.method = "vst", nfeatures = 2000, 
+                                             verbose = FALSE)
+}
+
+#Reference-based large dataset integration, https://satijalab.org/seurat/articles/integration_large_datasets.html
+reference.list <- sample.list[c("DMP", "h0", "lv5", "vl5")]
+samples.anchors <- FindIntegrationAnchors(object.list = reference.list, dims = 1:30)
+
+samples.integrated <- IntegrateData(anchorset = samples.anchors, dims = 1:30)
+
+# switch to integrated assay. The variable features of this assay are automatically set during integrateData
+DefaultAssay(samples.integrated) <- "integrated"
+
+# Run the standard workflow for visualization and clustering
+samples.integrated <- ScaleData(samples.integrated, verbose = FALSE)
+samples.integrated <- RunPCA(samples.integrated, npcs = 30, verbose = FALSE)
+pancreas.isamples.integratedntegrated <- RunUMAP(samples.integrated, reduction = "pca", dims = 1:30)
+p1 <- DimPlot(samples.integrated, reduction = "umap", group.by = "hoea.cell.type")
+p2 <- DimPlot(samples.integrated, reduction = "umap", group.by = "DMP_sample", label = TRUE, repel = TRUE) + 
+  NoLegend()
+plot_grid(p1, p2)
+
+#Alternative integration using Mutual Nearest Neighbor (MNN)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
